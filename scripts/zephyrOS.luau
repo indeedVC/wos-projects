@@ -22,35 +22,57 @@
     SOFTWARE.
 --]]
 
-local os = {}
+local zephyrOS = {}
 
-local Screen = GetPart("TouchScreen")
+local Screen = GetPart("ARController") or GetPart("TouchScreen") or GetPart("Screen")
 local Instrument = GetPart("Instrument")
 
-os.Library = {
+zephyrOS.Library = {
 	Screen = Screen,
 }
 
-os.Settings = {
+zephyrOS.Settings = {
 	AccentColor = Color3.fromRGB(51, 88, 130),
 }
 
-os.SystemStates = {
+zephyrOS.States = {
 	StartMenuOpened = false,
 }
 
-os.SystemThreads = {
+zephyrOS.Threads = {
 	StartMenu = nil,
 	RenderRegionTime = nil,
 	RenderScreenCursors = nil,
 }
 
-function Init()
+function zephyrOS:Shutdown()
+	Screen:ClearElements()
+	Screen:CreateElement("TextLabel", {
+		Size=UDim2.fromScale(1, 1),
+		Position=UDim2.fromScale(0, 0),
+		BackgroundColor3=Color3.fromRGB(0, 0, 0),
+		TextColor3=Color3.fromRGB(60, 60, 60),
+		Text="Goodbye",
+		Font=Enum.Font.Gotham,
+		TextScaled=true,
+	})
+	Beep(1)
+	task.wait(0.15)
+	Beep(0.75)
+	task.wait(0.2)
+	Beep(0.5)
+	task.wait(0.2)
+	Beep(0.35)
+	task.wait(0.45)
+	Microcontroller:Shutdown()
+end
+
+function Init() 
 	local Desktop = Screen:CreateElement("TextLabel", {
 		Size=UDim2.fromScale(1, 0.9),
 		Position=UDim2.fromScale(0, 0),
 		BackgroundColor3=Color3.fromRGB(0, 0, 0),
-		TextColor3=os.Settings.AccentColor,
+		TextColor3=zephyrOS.Settings.AccentColor,
 		Text="zephyr",
 		Font=Enum.Font.FredokaOne,
 		TextStrokeTransparency=0,
@@ -83,7 +105,7 @@ function Init()
 		Position=UDim2.fromScale(0, 0),
 		BackgroundColor3=Color3.fromRGB(30, 30, 30),
 		BorderColor3=Color3.fromRGB(255, 255, 255),
-		TextColor3=os.Settings.AccentColor,
+		TextColor3=zephyrOS.Settings.AccentColor,
 		TextStrokeTransparency=0,
 		TextStrokeColor3=Color3.fromRGB(255, 255, 255),
 		TextScaled=true,
@@ -92,9 +114,9 @@ function Init()
 	})
 
 	StartButton.MouseButton1Click:Connect(function()
-		if os.SystemStates.StartMenuOpened == false then
-			if os.SystemThreads.StartMenu == nil then
-				os.SystemThreads.StartMenu = Screen:CreateElement("Frame", {
+		if zephyrOS.States.StartMenuOpened == false then
+			if zephyrOS.Threads.StartMenu == nil then
+				zephyrOS.Threads.StartMenu = Screen:CreateElement("Frame", {
 					Parent=Desktop,
 					Size=UDim2.fromScale(0.4, 0.8),
 					Position=UDim2.fromScale(0, 0.2),
@@ -104,11 +126,11 @@ function Init()
 				})
 
 				local _Title = Screen:CreateElement("TextLabel", {
-					Parent=os.SystemThreads.StartMenu,
+					Parent=zephyrOS.Threads.StartMenu,
 					Size=UDim2.fromScale(1, 0.12),
 					Position=UDim2.fromScale(0, 0),
 					BackgroundTransparency=1,
-					TextColor3=os.Settings.AccentColor,
+					TextColor3=zephyrOS.Settings.AccentColor,
 					TextStrokeTransparency=0,
 					TextStrokeColor3=Color3.fromRGB(255, 255, 255),
 					TextScaled=true,
@@ -117,7 +139,7 @@ function Init()
 				})
 
 				local ShutdownButton = Screen:CreateElement("TextButton", {
-					Parent=os.SystemThreads.StartMenu,
+					Parent=zephyrOS.Threads.StartMenu,
                     Size=UDim2.fromScale(1, 0.1),
                     Position=UDim2.fromScale(0, 0.9),
                     BackgroundColor3=Color3.fromRGB(30, 30, 30),
@@ -129,25 +151,23 @@ function Init()
                 })
 
 				ShutdownButton.MouseButton1Click:Connect(function()
-					Microcontroller:Shutdown()
+					zephyrOS:Shutdown()
 				end)
 			end
 
-			StartButton.TextStrokeColor3 = os.Settings.AccentColor
+			StartButton.TextStrokeColor3 = zephyrOS.Settings.AccentColor
 			StartButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-			os.SystemThreads.StartMenu.Visible = true
-			os.SystemStates.StartMenuOpened = true
+			zephyrOS.Threads.StartMenu.Visible = true
+			zephyrOS.States.StartMenuOpened = true
 		else
 			StartButton.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
-			StartButton.TextColor3 = os.Settings.AccentColor
-			os.SystemThreads.StartMenu.Visible = false
-			os.SystemStates.StartMenuOpened = false
+			StartButton.TextColor3 = zephyrOS.Settings.AccentColor
+			zephyrOS.Threads.StartMenu.Visible = false
+			zephyrOS.States.StartMenuOpened = false
 		end
 	end)
 
-	Beep(1)
-
-	os.SystemThreads.RenderRegionTime = task.spawn(function()
+	zephyrOS.Threads.RenderRegionTime = task.spawn(function()
 		if not Instrument then
 			RegionTime:Destroy()
 			return
@@ -161,10 +181,12 @@ function Init()
 		end)
 	end)
 
-	os.SystemThreads.RenderScreenCursors = task.spawn(function()
+	zephyrOS.Threads.RenderScreenCursors = task.spawn(function()
 		local SavedCursors = {}
 	
-		Screen.CursorMoved:Connect(function()
+		local CanMoveCursors = true
+		Screen.CursorPressed:Connect(function()
+			if not CanMoveCursors then return end
 			for _, v in Screen:GetCursors() do
 				if SavedCursors[v.Player] == nil then
 					SavedCursors[v.Player] = Screen:CreateElement("Frame", {
@@ -193,6 +215,9 @@ function Init()
 	
 				SavedCursors[v.Player].Position = UDim2.fromOffset(v.X - 5, v.Y - 5)
 			end
+			CanMoveCursors = false
+			task.wait(0.025)
+			CanMoveCursors = true
 		end)
 
 		Microcontroller.Loop:Connect(function()
@@ -206,6 +231,16 @@ function Init()
 end
 
 local s, r = pcall(function()
+	task.spawn(function()
+		task.wait(0.2)
+		Beep(0.35)
+		task.wait(0.2)
+		Beep(0.5)
+		task.wait(0.2)
+		Beep(0.75)
+		task.wait(0.2)
+		Beep(1)
+	end)
 	Init()
 end)
 
